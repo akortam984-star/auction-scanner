@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { searchListings } from '@/lib/scrapers'
-import { SearchFilters } from '@/types/auction'
+import { searchListings } from '@/lib/db'
+import { SearchFilters } from '@/types/listing'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -19,11 +19,8 @@ export async function GET(request: NextRequest) {
     odometer_max: searchParams.get('odometer_max') ? Number(searchParams.get('odometer_max')) : undefined,
     primary_damage: searchParams.get('primary_damage') || undefined,
     title_type: searchParams.get('title_type') || undefined,
-    keys: searchParams.get('keys') || undefined,
-    fuel_type: searchParams.get('fuel_type') || undefined,
-    body_style: searchParams.get('body_style') || undefined,
-    location_state: searchParams.get('location_state') || undefined,
-    sort_by: (searchParams.get('sort_by') as SearchFilters['sort_by']) || 'sale_date',
+    state: searchParams.get('location_state') || undefined,
+    sort_by: (searchParams.get('sort_by') as SearchFilters['sort_by']) || 'sale_date_asc',
     page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
     per_page: 25,
   }
