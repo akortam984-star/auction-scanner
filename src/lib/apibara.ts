@@ -1,4 +1,4 @@
-import type { Listing, SearchFilters, SearchResult } from '@/types/listing'
+import type { AuctionListing, SearchFilters, SearchResult } from '@/types/auction'
 
 const BASE_URL = 'https://apibara.tech/api/v1/vehicle-auction'
 const API_KEY = process.env.APIBARA_API_KEY!
@@ -8,15 +8,20 @@ function apiHeaders() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapListing(v: any): Listing {
+function mapListing(v: any): AuctionListing {
+  const lotNum = v.lot_number ?? ''
+  const source = v.platform === 'copart' ? 'copart' : 'iaai'
+  const thumbs: string[] = v.media?.thumbs ?? []
+  const state = v.location?.display?.match(/\(([^)]+)\)/)?.[1] ?? null
+
   return {
-    id: v.lot_number ?? v.slug_vin,
-    source: v.platform === 'copart' ? 'copart' : 'iaai',
-    lot_number: v.lot_number ?? '',
+    id: `${source}-${lotNum}`,
+    source,
+    lot_number: lotNum,
     vin: v.vin ?? null,
     year: v.year ?? null,
-    make: v.make ?? null,
-    model: v.model ?? null,
+    make: v.make ?? '',
+    model: v.model ?? '',
     trim: v.details?.attributes?.Series ?? null,
     body_style: v.vehicle_specs?.body_style ?? null,
     color: v.vehicle_specs?.exterior_color ?? null,
@@ -25,27 +30,28 @@ function mapListing(v: any): Listing {
     primary_damage: v.condition?.primary_damage ?? null,
     secondary_damage: v.condition?.secondary_damage ?? null,
     title_type: v.sale_document?.name ?? null,
-    drive: v.vehicle_specs?.drive_type ?? null,
-    transmission: v.vehicle_specs?.transmission ?? null,
-    engine: v.vehicle_specs?.engine?.raw ?? null,
+    title_state: null,
+    keys: v.condition?.has_key ? 'Yes' : v.condition?.has_key === false ? 'No' : null,
     fuel_type: v.vehicle_specs?.fuel_type ?? null,
-    run_drive: v.condition?.run_condition?.value?.includes('RUNS') ?? null,
-    has_keys: v.condition?.has_key ?? null,
+    transmission: v.vehicle_specs?.transmission ?? null,
+    drive: v.vehicle_specs?.drive_type ?? null,
+    engine: v.vehicle_specs?.engine?.raw ?? null,
+    cylinders: null,
     current_bid: v.pricing?.current_bid_usd ?? null,
     buy_now_price: v.pricing?.buy_now_usd ?? null,
-    estimated_retail: null,
-    currency: 'USD',
     sale_date: v.auction?.full_date ?? null,
-    location_city: v.location?.display?.split(' (')[0] ?? null,
-    location_state: v.location?.display?.match(/\(([^)]+)\)/)?.[1] ?? null,
-    location_zip: null,
-    thumbnail_url: v.media?.thumbs?.[0] ?? null,
-    image_urls: v.media?.thumbs ?? [],
-    source_url: v.platform === 'copart'
-      ? `https://www.copart.com/lot/${v.lot_number}`
-      : `https://www.iaai.com/vehdynamic/StockDetails?stocknum=${v.lot_number}`,
+    location: v.location?.display ?? null,
+    location_state: state,
+    images: thumbs,
+    thumbnail: thumbs[0] ?? null,
+    source_url: source === 'copart'
+      ? `https://www.copart.com/lot/${lotNum}`
+      : `https://www.iaai.com/vehdynamic/StockDetails?stocknum=${lotNum}`,
+    loss_type: null,
+    condition_grade: null,
+    seller: v.seller?.name ?? null,
+    highlights: [],
     scraped_at: new Date().toISOString(),
-    is_active: true,
   }
 }
 
@@ -67,7 +73,7 @@ export async function searchApibaraListings(filters: SearchFilters): Promise<Sea
   if (filters.odometer_max) params.set('odometer_to', String(filters.odometer_max))
   if (filters.primary_damage) params.set('primary_damage', filters.primary_damage)
   if (filters.title_type) params.set('title_type', filters.title_type)
-  if (filters.state) params.set('state', filters.state)
+  if (filters.location_state) params.set('state', filters.location_state)
 
   const res = await fetch(`${BASE_URL}/vehicles?${params}`, {
     headers: apiHeaders(),
@@ -79,12 +85,17 @@ export async function searchApibaraListings(filters: SearchFilters): Promise<Sea
   const json = await res.json()
   const vehicles = Array.isArray(json.data) ? json.data : []
   const total = json.meta?.total ?? vehicles.length
+  const listings = vehicles.map(mapListing)
 
   return {
-    listings: vehicles.map(mapListing),
+    listings,
     total,
     page,
     per_page,
     total_pages: Math.ceil(total / per_page),
+    sources: {
+      copart: listings.filter((l: AuctionListing) => l.source === 'copart').length,
+      iaai: listings.filter((l: AuctionListing) => l.source === 'iaai').length,
+    },
   }
 }
