@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { searchListings } from '@/lib/db'
+import { searchApibaraListings } from '@/lib/apibara'
 import { SearchFilters } from '@/types/listing'
 
 export const runtime = 'nodejs'
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await searchListings(filters)
+    const result = await searchApibaraListings(filters)
     return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
